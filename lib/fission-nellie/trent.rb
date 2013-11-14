@@ -15,12 +15,17 @@ module Fission
           p_lock[:process].io.send(k).rewind
           debug "#{k}<#{payload[:process_notification]}>: #{p_lock[:process].io.send(k).read}"
         end
+        successful = p_lock[:process].crashed?
         process_manager.unlock(p_lock)
         process_manager.delete(payload[:process_notification])
-        if(payload[:nellie_commands] && !payload[:nellie_commands].empty?)
-          debug "Process cleanup is not final process for payload. No notifications."
+        if(successful)
+          if(payload[:nellie_commands] && !payload[:nellie_commands].empty?)
+            debug "Process cleanup is not final process for payload. No notifications."
+          else
+            debug "This payload is complete! Who the hell do I tell!?"
+          end
         else
-          debug "This payload is complete! Who the hell do I tell!?"
+          error "Process failed! Send notification at what?"
         end
       end
     end
