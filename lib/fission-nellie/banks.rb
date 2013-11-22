@@ -1,5 +1,6 @@
 require 'fission/callback'
 require 'fission/validators/validate'
+require 'fission/validators/repository'
 
 module Fission
   module Nellie
@@ -8,14 +9,8 @@ module Fission
       SCRIPT_NAME = '.nellie'
 
       def valid?(message)
-        super
-        m = unpack(message)
-        if(m[:data][:repository])
-          if(m[:data][:process_notification])
-            m[:data][:nellie_commands] && !m[:data][:nellie_commands].empty?
-          else
-            true
-          end
+        super do |m|
+          m[:data][:repository] && !m[:data][:process_notification]
         end
       end
 
@@ -44,12 +39,18 @@ module Fission
         if(payload[:data][:nellie_commands])
           command = payload[:data][:nellie_commands].shift
         end
-        process_pid = run_process(command,
-          :source => message[:source],
-          :payload => payload,
-          :cwd => payload[:data][:repository][:path]
-        )
-        debug "Process left running with process id of: #{process_pid}"
+        if(command)
+          process_pid = run_process(command,
+            :source => message[:source],
+            :payload => payload,
+            :cwd => payload[:data][:repository][:path]
+          )
+          debug "Process left running with process id of: #{process_pid}"
+        end
+        if(!payload[:data][:nellie_commands] || payload[:data][:nellie_commands].empty?)
+          payload[:data].delete(:nellie_commands)
+          completed(payload, message)
+        end
       end
 
       def run_script(test_path, source, payload)
@@ -86,5 +87,5 @@ module Fission
 end
 
 Fission.register(:nellie, :validators, Fission::Validators::Validate)
-Fission.register(:nellie, :validators, Fission::PackageBuilder::Repository)
+Fission.register(:nellie, :validators, Fission::Validators::Repository)
 Fission.register(:nellie, :banks, Fission::Nellie::Banks)
