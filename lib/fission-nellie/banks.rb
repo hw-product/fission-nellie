@@ -1,3 +1,6 @@
+require 'fission/callback'
+require 'fission/validators/validate'
+
 module Fission
   module Nellie
     class Banks < Callback
@@ -81,6 +84,6 @@ module Fission
   end
 end
 
-Fission.register(:fission_nellie, Fission::Validators::Validate)
-Fission.register(:fission_nellie, Fission::PackageBuilder::Repository)
-Fission.register(:fission_nellie, Fission::Nellie::Banks)
+Fission.register(:nellie, :validators, Fission::Validators::Validate)
+Fission.register(:nellie, :validators, Fission::PackageBuilder::Repository)
+Fission.register(:nellie, :banks, Fission::Nellie::Banks)
