@@ -1,3 +1,4 @@
+require 'shellwords'
 require 'fission/callback'
 require 'fission/validators/validate'
 require 'fission/validators/repository'
@@ -74,12 +75,6 @@ module Fission
           proc.start
         end
         process_pid
-      end
-
-      def run_json(message, json)
-        json['commands'].each do |command|
-          run_process(message, *command.split(' '))
-        end
       end
 
     end
