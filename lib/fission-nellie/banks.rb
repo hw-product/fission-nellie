@@ -8,10 +8,11 @@ module Fission
       SCRIPT_NAME = '.nellie'
 
       def valid?(message)
+        super
         m = unpack(message)
-        if(m[:repository])
-          if(m[:process_notification])
-            m[:nellie_commands] && !m[:nellie_commands].empty?
+        if(m[:data][:repository])
+          if(m[:data][:process_notification])
+            m[:data][:nellie_commands] && !m[:data][:nellie_commands].empty?
           else
             true
           end
@@ -23,15 +24,15 @@ module Fission
         process_pid = nil
         command = nil
         debug "Processing message for testing"
-        test_path = File.join(payload[:repository][:path], SCRIPT_NAME)
+        test_path = File.join(payload[:data][:repository][:path], SCRIPT_NAME)
 
-        unless(payload[:nellie_commands])
+        unless(payload[:data][:nellie_commands])
           if(File.exists?(test_path))
             debug "Running test at path: #{test_path}"
             begin
               json = JSON.load(File.read(test_path))
               debug 'Nellie file is JSON. Populating commands into payload and tossing back to the queue.'
-              payload[:nellie_commands] = json['commands']
+              payload[:data][:nellie_commands] = json['commands']
             rescue
               debug 'Looks like that wasn\'t JSON. Lets just execute it!'
               command = File.executable?(test_path) ? test_path : "/bin/bash #{test_path}"
@@ -40,13 +41,13 @@ module Fission
             abort "No nellie file found! (checked: #{test_path})"
           end
         end
-        if(payload[:nellie_commands])
-          command = payload[:nellie_commands].shift
+        if(payload[:data][:nellie_commands])
+          command = payload[:data][:nellie_commands].shift
         end
         process_pid = run_process(command,
           :source => message[:source],
           :payload => payload,
-          :cwd => payload[:repository][:path]
+          :cwd => payload[:data][:repository][:path]
         )
         debug "Process left running with process id of: #{process_pid}"
       end
