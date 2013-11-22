@@ -1,3 +1,5 @@
+require 'fission/callback'
+
 module Fission
   module Nellie
     class Trent < Callback
@@ -22,7 +24,8 @@ module Fission
           if(payload[:nellie_commands] && !payload[:nellie_commands].empty?)
             debug "Process cleanup is not final process for payload. No notifications."
           else
-            debug "This payload is complete! Who the hell do I tell!?"
+            [:nellie_commands, :process_notification].each{|key| payload.delete(key) }
+            completed(payload, message)
           end
         else
           error "Process failed! Send notification at what?"
@@ -32,4 +35,4 @@ module Fission
   end
 end
 
-Fission.register(:fission_nellie, Fission::Nellie::Trent)
+Fission.register(:nellie, :trent, Fission::Nellie::Trent)
