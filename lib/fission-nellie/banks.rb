@@ -2,12 +2,21 @@ require 'shellwords'
 require 'fission/callback'
 require 'fission/validators/validate'
 require 'fission/validators/repository'
+require 'fission-assets'
+require 'fission-assets/packer'
 
 module Fission
   module Nellie
     class Banks < Callback
 
       SCRIPT_NAME = '.nellie'
+
+      attr_reader :object_store, :working_directory
+
+      def setup(*_)
+        @object_store = Fission::Assets::Store.new
+        @working_directory = Carnivore::Config.get(:fission, :nellie, :working_directory) || '/tmp/nellie'
+      end
 
       def valid?(message)
         super do |m|
@@ -20,8 +29,14 @@ module Fission
         process_pid = nil
         command = nil
         debug "Processing message for testing"
-        test_path = File.join(payload[:data][:repository][:path], SCRIPT_NAME)
-
+        repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
+        test_path = File.join(
+          Fission::Assets::Packer.unpack(
+            object_store.get(payload[:data][:repository][:path]),
+            repository_path,
+            :disable_overwrite
+          ), SCRIPT_NAME
+        )
         unless(payload[:data][:nellie_commands])
           if(File.exists?(test_path))
             debug "Running test at path: #{test_path}"
@@ -44,7 +59,7 @@ module Fission
           process_pid = run_process(command,
             :source => message[:source],
             :payload => payload,
-            :cwd => payload[:data][:repository][:path]
+            :cwd => repository_path
           )
           debug "Process left running with process id of: #{process_pid}"
         end
