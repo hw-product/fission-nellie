@@ -64,6 +64,7 @@ module Fission
             debug "Process left running with process id of: #{process_pid}"
           else
             payload[:data].delete(:nellie_commands)
+            set_success_email(payload)
             completed(payload, message)
           end
         end
@@ -91,6 +92,34 @@ module Fission
         end
         process_pid
       end
+
+      # Set payload data for mail type notifications
+      # TODO: custom mail address provided via .nellie file?
+      def set_success_email(payload)
+        project_name = retrieve(payload, :data, :github, :repository, :name)
+        completed_sha = retrieve(payload, :data, :github, :after)
+        dest_email = [
+          retrieve(payload, :data, :github, :repository, :owner, :email),
+          retrieve(payload, :data, :github, :pusher, :email)
+        ].compact
+        details = retrieve(payload, :data, :github, :compare)
+        notify = {
+          :destination => dest_email.map{ |target|
+            {:email => target}
+          },
+          :origin => {
+            :email => origin[:email],
+            :name => origin[:name]
+          }
+        }
+        notify.merge!(
+          :subject => "[#{origin[:name]}] SUCCESS #{project_name} build complete",
+          :message => "Build of #{project_name} at SHA: #{completed_sha} has successfully built.\nComparision at: #{details}",
+          :html => false
+        )
+        payload[:data][:notification_email] = notify
+      end
+
 
     end
   end
