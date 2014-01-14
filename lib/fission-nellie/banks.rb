@@ -25,47 +25,48 @@ module Fission
       end
 
       def execute(message)
-        payload = unpack(message)
-        process_pid = nil
-        command = nil
-        debug "Processing message for testing"
-        repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
-        test_path = File.join(
-          Fission::Assets::Packer.unpack(
-            object_store.get(payload[:data][:repository][:path]),
-            repository_path,
-            :disable_overwrite
-          ), SCRIPT_NAME
-        )
-        unless(payload[:data][:nellie_commands])
-          if(File.exists?(test_path))
-            debug "Running test at path: #{test_path}"
-            begin
-              json = JSON.load(File.read(test_path))
-              debug 'Nellie file is JSON. Populating commands into payload and tossing back to the queue.'
-              payload[:data][:nellie_commands] = json['commands']
-            rescue
-              debug 'Looks like that wasn\'t JSON. Lets just execute it!'
-              command = File.executable?(test_path) ? test_path : "/bin/bash #{test_path}"
-            end
-          else
-            abort "No nellie file found! (checked: #{test_path})"
-          end
-        end
-        if(payload[:data][:nellie_commands])
-          command = payload[:data][:nellie_commands].shift
-        end
-        if(command)
-          process_pid = run_process(command,
-            :source => message[:source],
-            :payload => payload,
-            :cwd => repository_path
+        failure_wrap(message) do |payload|
+          process_pid = nil
+          command = nil
+          debug "Processing message for testing"
+          repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
+          test_path = File.join(
+            Fission::Assets::Packer.unpack(
+              object_store.get(payload[:data][:repository][:path]),
+              repository_path,
+              :disable_overwrite
+            ), SCRIPT_NAME
           )
-          debug "Process left running with process id of: #{process_pid}"
-        end
-        if(!payload[:data][:nellie_commands] || payload[:data][:nellie_commands].empty?)
-          payload[:data].delete(:nellie_commands)
-          completed(payload, message)
+          unless(payload[:data][:nellie_commands])
+            if(File.exists?(test_path))
+              debug "Running test at path: #{test_path}"
+              begin
+                json = JSON.load(File.read(test_path))
+                debug 'Nellie file is JSON. Populating commands into payload and tossing back to the queue.'
+                payload[:data][:nellie_commands] = json['commands']
+              rescue
+                debug 'Looks like that wasn\'t JSON. Lets just execute it!'
+                command = File.executable?(test_path) ? test_path : "/bin/bash #{test_path}"
+              end
+            else
+              abort "No nellie file found! (checked: #{test_path})"
+            end
+          end
+          if(payload[:data][:nellie_commands])
+            command = payload[:data][:nellie_commands].shift
+          end
+          if(command)
+            process_pid = run_process(command,
+              :source => message[:source],
+              :payload => payload,
+              :cwd => repository_path
+            )
+            debug "Process left running with process id of: #{process_pid}"
+          end
+          if(!payload[:data][:nellie_commands] || payload[:data][:nellie_commands].empty?)
+            payload[:data].delete(:nellie_commands)
+            completed(payload, message)
+          end
         end
       end
 

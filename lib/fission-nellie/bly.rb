@@ -6,20 +6,21 @@ module Fission
       class Log < Callback
 
         def valid?(message)
-          super
-          m = unpack(message)
-          m[:nellie] &&
-            m[:nellie][:request] &&
-            m[:nellie][:request][:type] == 'log'
+          super do |m|
+            m[:nellie] &&
+              m[:nellie][:request] &&
+              m[:nellie][:request][:type] == 'log'
+          end
         end
 
         # {:nellie => :request => {:type => :stderr, :process_pid =>
         # uuid, :start => integer, :limit => integer}}
         def execute(message)
-          payload = unpack(message)
-          request = payload[:nellie].delete(:request)
-          set_log(payload, request)
-          completed(payload)
+          failure_wrap(message) do |payload|
+            request = payload[:nellie].delete(:request)
+            set_log(payload, request)
+            completed(payload)
+          end
         end
 
         def set_log(payload, request)
