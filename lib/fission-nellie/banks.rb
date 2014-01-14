@@ -62,8 +62,7 @@ module Fission
               :cwd => repository_path
             )
             debug "Process left running with process id of: #{process_pid}"
-          end
-          if(!payload[:data][:nellie_commands] || payload[:data][:nellie_commands].empty?)
+          else
             payload[:data].delete(:nellie_commands)
             completed(payload, message)
           end
