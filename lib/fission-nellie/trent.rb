@@ -14,9 +14,11 @@ module Fission
         failure_wrap(message) do |payload|
           debug "Cleanup of nellie generated process - #{payload[:data][:process_notification]}"
           p_lock = process_manager.lock(payload[:data][:process_notification])
+          logs = {}
           %w(stdout stderr).each do |k|
             p_lock[:process].io.send(k).rewind
-            debug "#{k}<#{payload[:data][:process_notification]}>: #{p_lock[:process].io.send(k).read}"
+            logs[k] = p_lock[:process].io.send(k).read
+            debug "#{k}<#{payload[:data][:process_notification]}>: #{logs[k]}"
           end
           successful = p_lock[:process].exit_code == 0
           process_manager.unlock(p_lock)
@@ -26,10 +28,48 @@ module Fission
             forward(payload)
           else
             error "Nellie process failed! Process ID: #{payload[:data][:process_notification]}"
-            debug "Payload needs to be transmitted to `:finalizer`"
+            set_github_status(payload, :failure)
+            set_failure_email(payload, logs)
+            payload[:data][:nellie] ||= {}
+            payload[:data][:nellie][:logs] = logs
+            failed(message, payload, 'Process returned failure status')
           end
         end
       end
+
+      # Set payload data for mail type notifications
+      # TODO: custom mail address provided via .nellie file?
+      def set_email(payload, files={})
+        project_name = retrieve(payload, :data, :github, :repository, :name)
+        failed_sha = retrieve(payload, :data, :github, :after)
+        dest_email = [
+          retrieve(payload, :data, :github, :repository, :owner, :email),
+          retrieve(payload, :data, :github, :pusher, :email)
+        ].compact
+        details = Carnivore::Config.get(payload, :data, :github, :compare)
+        files = {}.tap do |new_files|
+          files.each do |k,v|
+            new_files["#{k}.txt"] = v
+          end
+        end
+        notify = {
+          :destination => dest_email.map{ |target|
+            {:email => target}
+          },
+          :origin => {
+            :email => origin[:email],
+            :name => origin[:name]
+          },
+          :attachments => files
+        }
+        notify.merge!(
+          :subject => "[#{origin[:site]}] FAILED #{project_name} build failure",
+          :message => "Build failure encountered on #{project_name} at SHA: #{failed_sha}<br/>Comparision at: #{details}",
+          :html => true
+        )
+        payload[:data][:notification_email] = notify
+      end
+
     end
   end
 end
