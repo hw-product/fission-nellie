@@ -32,21 +32,21 @@ module Fission
             set_failure_email(payload, logs)
             payload[:data][:nellie] ||= {}
             payload[:data][:nellie][:logs] = logs
-            failed(message, payload, 'Process returned failure status')
+            job_completed('nellie', payload, message)
           end
         end
       end
 
       # Set payload data for mail type notifications
       # TODO: custom mail address provided via .nellie file?
-      def set_email(payload, files={})
+      def set_failure_email(payload, files={})
         project_name = retrieve(payload, :data, :github, :repository, :name)
         failed_sha = retrieve(payload, :data, :github, :after)
         dest_email = [
           retrieve(payload, :data, :github, :repository, :owner, :email),
           retrieve(payload, :data, :github, :pusher, :email)
         ].compact
-        details = Carnivore::Config.get(payload, :data, :github, :compare)
+        details = retrieve(payload, :data, :github, :compare)
         files = {}.tap do |new_files|
           files.each do |k,v|
             new_files["#{k}.txt"] = v
@@ -63,9 +63,9 @@ module Fission
           :attachments => files
         }
         notify.merge!(
-          :subject => "[#{origin[:site]}] FAILED #{project_name} build failure",
-          :message => "Build failure encountered on #{project_name} at SHA: #{failed_sha}<br/>Comparision at: #{details}",
-          :html => true
+          :subject => "[#{origin[:name]}] FAILED #{project_name} build failure",
+          :message => "Build failure encountered on #{project_name} at SHA: #{failed_sha}\nComparision at: #{details}",
+          :html => false
         )
         payload[:data][:notification_email] = notify
       end
