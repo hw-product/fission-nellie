@@ -65,7 +65,7 @@ module Fission
           else
             payload[:data].delete(:nellie_commands)
             set_success_email(payload)
-            completed(payload, message)
+            job_completed('nellie', payload, message)
           end
         end
       end
