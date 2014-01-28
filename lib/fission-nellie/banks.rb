@@ -59,7 +59,11 @@ module Fission
             process_pid = run_process(command,
               :source => message[:source],
               :payload => payload,
-              :cwd => repository_path
+              :cwd => repository_path,
+              :environment => {
+                'NELLIE_GIT_COMMIT_SHA' => retrieve(payload, :data, :github, :head_commit, :id),
+                'NELLIE_GIT_REF' => retrieve(payload, :data, :github, :ref)
+              }
             )
             debug "Process left running with process id of: #{process_pid}"
           else
