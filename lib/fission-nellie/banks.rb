@@ -130,7 +130,6 @@ module Fission
         payload[:data][:notification_email] = notify
       end
 
-
     end
   end
 end
