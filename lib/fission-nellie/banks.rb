@@ -37,13 +37,15 @@ module Fission
               :disable_overwrite
             ), SCRIPT_NAME
           )
-          unless(payload[:data][:nellie_commands])
+          unless(payload[:data][:nellie])
             if(File.exists?(test_path))
               debug "Running test at path: #{test_path}"
               begin
                 json = JSON.load(File.read(test_path))
                 debug 'Nellie file is JSON. Populating commands into payload and tossing back to the queue.'
-                payload[:data][:nellie_commands] = json['commands']
+                payload[:data][:nellie] ||= {}
+                payload[:data][:nellie][:commands] = json['commands']
+                payload[:data][:nellie][:environment] = json.fetch('environment', {})
               rescue
                 debug 'Looks like that wasn\'t JSON. Lets just execute it!'
                 command = File.executable?(test_path) ? test_path : "/bin/bash #{test_path}"
@@ -52,8 +54,8 @@ module Fission
               abort "No nellie file found! (checked: #{test_path})"
             end
           end
-          if(payload[:data][:nellie_commands])
-            command = payload[:data][:nellie_commands].shift
+          if(retrieve(payload, :data, :nellie, :commands))
+            command = payload[:data][:nellie][:commands].shift
           end
           if(command)
             process_pid = run_process(command,
@@ -63,11 +65,15 @@ module Fission
               :environment => {
                 'NELLIE_GIT_COMMIT_SHA' => retrieve(payload, :data, :github, :head_commit, :id),
                 'NELLIE_GIT_REF' => retrieve(payload, :data, :github, :ref)
-              }
+              }.merge(payload[:data][:nellie][:environment])
             )
             debug "Process left running with process id of: #{process_pid}"
           else
-            payload[:data].delete(:nellie_commands)
+            [:commands, :environment].each do |key|
+              if(retrieve(payload, :data, :nellie, key))
+                payload[:data][:nellie].delete(key)
+              end
+            end
             set_success_email(payload)
             job_completed('nellie', payload, message)
           end
