@@ -92,12 +92,14 @@ module Fission
       def run_process(command, pack={})
         process_pid = Celluloid.uuid
         cwd = pack.delete(:cwd) || '/tmp'
+        env = = pack.delete(:environment)
         stdout_log = process_manager.create_io_tmp(process_pid, 'stdout')
         stderr_log = process_manager.create_io_tmp(process_pid, 'stderr')
         process_manager.process(process_pid, command, pack) do |proc|
           proc.cwd = cwd
           proc.io.stdout = stdout_log
           proc.io.stderr = stderr_log
+          proc.environment.replace(env) if env
           proc.start
         end
         process_pid
