@@ -7,9 +7,9 @@ Gem::Specification.new do |s|
   s.author = 'Heavywater'
   s.email = 'fission@hw-ops.com'
   s.homepage = 'http://github.com/heavywater/fission-nellie'
-  s.description = 'Fuck Jenkins'
+  s.description = 'Do things'
   s.require_path = 'lib'
   s.add_dependency 'fission'
-  s.add_dependency 'carnivore'
+  s.add_dependency 'elecksee'
   s.files = Dir['**/*']
 end

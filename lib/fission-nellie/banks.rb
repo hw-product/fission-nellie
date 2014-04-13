@@ -1,7 +1,7 @@
 require 'shellwords'
 require 'fission/callback'
-require 'fission/validators/validate'
-require 'fission/validators/repository'
+require 'fission-nellie/validators/validate'
+require 'fission-nellie/validators/repository'
 require 'fission-assets'
 require 'fission-assets/packer'
 
@@ -136,6 +136,4 @@ module Fission
   end
 end
 
-Fission.register(:nellie, :validators, Fission::Validators::Validate)
-Fission.register(:nellie, :validators, Fission::Validators::Repository)
 Fission.register(:nellie, :banks, Fission::Nellie::Banks)
