@@ -92,15 +92,6 @@ module Fission
         end
       end
 
-      def run_script(test_path, source, payload)
-        run_process("/bin/bash #{test_path}",
-          :source => source,
-          :payload => payload,
-          :cwd => File.dirname(test_path)
-        )
-        process_pid = run_process(message, '/bin/bash', test_path)
-      end
-
       def run_process(command, pack={})
         process_pid = Celluloid.uuid
         cwd = pack.delete(:cwd) || '/tmp'
