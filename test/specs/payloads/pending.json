@@ -1,0 +1,14 @@
+{
+  "job": "test",
+  "message_id": "some_uuid",
+  "data": {
+    "nellie": {
+      "status": {
+        "interval": 1,
+        "source": "test"
+      },
+      "commands": [ 'sleep 4' ]
+    }
+  },
+  "complete": []
+}
