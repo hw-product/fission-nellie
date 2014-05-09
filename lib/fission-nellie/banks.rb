@@ -62,6 +62,7 @@ module Fission
               :source => message[:source],
               :payload => payload,
               :cwd => repository_path,
+              :pending => enable_pending(payload),
               :environment => {
                 'NELLIE_GIT_COMMIT_SHA' => retrieve(payload, :data, :github, :head_commit, :id),
                 'NELLIE_GIT_REF' => retrieve(payload, :data, :github, :ref)
@@ -73,6 +74,17 @@ module Fission
               payload[:data][:nellie].delete(key)
             end
             job_completed('nellie', payload, message)
+          end
+        end
+      end
+
+      # @return [Smash, nil]
+      def enable_pending(payload)
+        if(pending = Carnivore::Config.get(:fission, :nellie, :status))
+          Smash.new.tap do |pending_config|
+            pending_config[:interval] = pending[:interval]
+            pending_config[:source] = pending[:source]
+            pending_config[:reference] = payload[:message_id]
           end
         end
       end
