@@ -2,12 +2,15 @@
   "job": "test",
   "message_id": "some_uuid",
   "data": {
+    "repository": {
+      "path": "/tmp/repository"
+    },
     "nellie": {
       "status": {
         "interval": 1,
         "source": "test"
       },
-      "commands": [ 'sleep 4' ]
+      "commands": [ "sleep 4" ]
     }
   },
   "complete": []
