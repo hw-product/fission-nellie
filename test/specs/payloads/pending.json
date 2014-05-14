@@ -10,6 +10,7 @@
         "interval": 1,
         "source": "test"
       },
+      "environment": {},
       "commands": [ "sleep 4" ]
     }
   },
