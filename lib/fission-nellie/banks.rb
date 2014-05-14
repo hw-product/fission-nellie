@@ -29,15 +29,15 @@ module Fission
           process_pid = nil
           command = nil
           debug "Processing message for testing"
-          repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
-          test_path = File.join(
-            Fission::Assets::Packer.unpack(
-              object_store.get(payload[:data][:repository][:path]),
-              repository_path,
-              :disable_overwrite
-            ), SCRIPT_NAME
-          )
           unless(payload[:data][:nellie])
+            repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
+            test_path = File.join(
+              Fission::Assets::Packer.unpack(
+                object_store.get(payload[:data][:repository][:path]),
+                repository_path,
+                :disable_overwrite
+              ), SCRIPT_NAME
+            )
             if(File.exists?(test_path))
               debug "Running test at path: #{test_path}"
               begin
