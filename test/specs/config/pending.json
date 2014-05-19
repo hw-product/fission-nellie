@@ -29,6 +29,10 @@
         "type": "spec"
       }
     },
+    "utils": {
+      "process": {
+        "max_processes": 2}
+    },
     "workers": {
       "nellie": 1
     }
