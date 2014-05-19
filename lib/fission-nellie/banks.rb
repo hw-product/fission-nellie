@@ -29,15 +29,15 @@ module Fission
           process_pid = nil
           command = nil
           debug "Processing message for testing"
-          repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
-          test_path = File.join(
-            Fission::Assets::Packer.unpack(
-              object_store.get(payload[:data][:repository][:path]),
-              repository_path,
-              :disable_overwrite
-            ), SCRIPT_NAME
-          )
           unless(payload[:data][:nellie])
+            repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
+            test_path = File.join(
+              Fission::Assets::Packer.unpack(
+                object_store.get(payload[:data][:repository][:path]),
+                repository_path,
+                :disable_overwrite
+              ), SCRIPT_NAME
+            )
             if(File.exists?(test_path))
               debug "Running test at path: #{test_path}"
               begin
@@ -62,6 +62,7 @@ module Fission
               :source => message[:source],
               :payload => payload,
               :cwd => repository_path,
+              :pending => enable_pending(payload),
               :environment => {
                 'NELLIE_GIT_COMMIT_SHA' => retrieve(payload, :data, :github, :head_commit, :id),
                 'NELLIE_GIT_REF' => retrieve(payload, :data, :github, :ref)
@@ -80,13 +81,15 @@ module Fission
         end
       end
 
-      def run_script(test_path, source, payload)
-        run_process("/bin/bash #{test_path}",
-          :source => source,
-          :payload => payload,
-          :cwd => File.dirname(test_path)
-        )
-        process_pid = run_process(message, '/bin/bash', test_path)
+      # @return [Smash, nil]
+      def enable_pending(payload)
+        if(pending = Carnivore::Config.get(:fission, :nellie, :status))
+          Smash.new.tap do |pending_config|
+            pending_config[:interval] = pending[:interval]
+            pending_config[:source] = pending[:source]
+            pending_config[:reference] = payload[:message_id]
+          end
+        end
       end
 
       def run_process(command, pack={})

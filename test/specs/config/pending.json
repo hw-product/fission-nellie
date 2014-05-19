@@ -1,0 +1,40 @@
+{
+  "fission": {
+    "nellie_webhook": {
+      "endpoint": "test.com",
+      "method": "post"
+    },
+    "nellie": {
+      "status": {
+        "interval": 1,
+        "source": "nellie_webhook"
+      }
+    },
+    "handlers": {
+      "error": "test"
+    },
+    "loaders": {
+      "workers": [
+        "fission-nellie"
+      ],
+      "sources": [
+        "carnivore-actor"
+      ]
+    },
+    "sources": {
+      "nellie": {
+        "type": "actor"
+      },
+      "test": {
+        "type": "spec"
+      }
+    },
+    "utils": {
+      "process": {
+        "max_processes": 2}
+    },
+    "workers": {
+      "nellie": 1
+    }
+  }
+}
