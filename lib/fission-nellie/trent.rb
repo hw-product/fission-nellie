@@ -24,14 +24,12 @@ module Fission
           process_manager.unlock(p_lock)
           process_manager.delete(payload[:data][:process_notification])
           if(successful)
-            payload[:data].delete(:process_notification)
+            payload.set(:data, :nellie, :status, 'ok')
             forward(payload)
           else
             error "Nellie process failed! Process ID: #{payload[:data][:process_notification]}"
-            set_github_status(payload, :failure)
-            set_failure_email(payload, logs)
-            payload[:data][:nellie] ||= {}
-            payload[:data][:nellie][:logs] = logs
+            payload.set(:data, :nellie, :status, 'fail')
+            payload.set(:data, :nellie, :logs, logs)
             job_completed('nellie', payload, message)
           end
         end
