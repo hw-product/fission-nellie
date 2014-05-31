@@ -23,6 +23,7 @@ module Fission
           successful = p_lock[:process].exit_code == 0
           process_manager.unlock(p_lock)
           process_manager.delete(payload[:data][:process_notification])
+          payload[:data].delete(:process_notification)
           if(successful)
             payload.set(:data, :nellie, :status, 'ok')
             forward(payload)
