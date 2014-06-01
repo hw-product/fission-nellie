@@ -70,11 +70,8 @@ module Fission
             debug "Process left running with process id of: #{process_pid}"
           else
             [:commands, :environment].each do |key|
-              if(retrieve(payload, :data, :nellie, key))
-                payload[:data][:nellie].delete(key)
-              end
+              payload[:data][:nellie].delete(key)
             end
-            set_success_email(payload)
             job_completed('nellie', payload, message)
           end
         end
