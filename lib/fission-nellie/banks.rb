@@ -85,6 +85,11 @@ module Fission
             pending_config[:interval] = pending[:interval]
             pending_config[:source] = pending[:source]
             pending_config[:reference] = payload[:message_id]
+            pending_config[:data] = Smash.new(
+              :repository => payload.get(:data, :github, :repository, :name),
+              :reference => payload.get(:data, :github, :ref),
+              :commit_sha => payload.get(:data, :github, :after)
+            )
           end
         end
       end
