@@ -2,14 +2,21 @@ require 'fission/callback'
 
 module Fission
   module Nellie
+    # Process cleanup
     class Trent < Callback
 
+      # Validity of message
+      #
+      # @return [Truthy, Falsey]
       def valid?(message)
         super do |m|
-          m[:data][:process_notification]
+          m.get(:data, :process_notification)
         end
       end
 
+      # Clean up process and forward payload
+      #
+      # @param message [Carnivore::Message]
       def execute(message)
         failure_wrap(message) do |payload|
           debug "Cleanup of nellie generated process - #{payload[:data][:process_notification]}"
@@ -34,39 +41,6 @@ module Fission
             job_completed('nellie', payload, message)
           end
         end
-      end
-
-      # Set payload data for mail type notifications
-      # TODO: custom mail address provided via .nellie file?
-      def set_failure_email(payload, files={})
-        project_name = retrieve(payload, :data, :github, :repository, :name)
-        failed_sha = retrieve(payload, :data, :github, :after)
-        dest_email = [
-          retrieve(payload, :data, :github, :repository, :owner, :email),
-          retrieve(payload, :data, :github, :pusher, :email)
-        ].compact
-        details = retrieve(payload, :data, :github, :compare)
-        files = {}.tap do |new_files|
-          files.each do |k,v|
-            new_files["#{k}.txt"] = v
-          end
-        end
-        notify = {
-          :destination => dest_email.map{ |target|
-            {:email => target}
-          },
-          :origin => {
-            :email => origin[:email],
-            :name => origin[:name]
-          },
-          :attachments => files
-        }
-        notify.merge!(
-          :subject => "[#{origin[:name]}] FAILED #{project_name} build failure",
-          :message => "Build failure encountered on #{project_name} at SHA: #{failed_sha}\nComparision at: #{details}",
-          :html => false
-        )
-        payload[:data][:notification_email] = notify
       end
 
     end
