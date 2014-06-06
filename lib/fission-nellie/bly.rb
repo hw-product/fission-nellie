@@ -2,19 +2,37 @@ require 'fission/callback'
 
 module Fission
   module Nellie
+    # Process informationer
     class Bly
+      # Provide log information
       class Log < Callback
 
+        # Validity of message
+        #
+        # @param message [Carnivore::Message]
+        # @return [TrueClass, FalseClass]
         def valid?(message)
           super do |m|
-            m[:nellie] &&
-              m[:nellie][:request] &&
-              m[:nellie][:request][:type] == 'log'
+            m.get(:nellie, :request, :type) == 'log'
           end
         end
 
-        # {:nellie => :request => {:type => :stderr, :process_pid =>
-        # uuid, :start => integer, :limit => integer}}
+        # Add log information to payload
+        #
+        # @param message [Carnivore::Message]
+        # @example
+        #   payload data structure:
+        #   {
+        #     :nellie => {
+        #       :request => {
+        #         :type => 'log',
+        #         :kind => 'stderr',
+        #         :process_pid => 'UUID',
+        #         :start => IntegerStartPoint,
+        #         :limit => IntegerMaxBytes
+        #       }
+        #     }
+        #   }
         def execute(message)
           failure_wrap(message) do |payload|
             request = payload[:nellie].delete(:request)
@@ -23,6 +41,14 @@ module Fission
           end
         end
 
+        # Set log into payload
+        #
+        # @param payload [Hash]
+        # @param request [Hash]
+        # @option request [String] :process_pid process UUID
+        # @option request [Numeric] :start start location in log
+        # @option request [Numeric] :limit max number of bytes to read
+        # @option request [String] :kind stdout or stderr
         def set_log(payload, request)
           p_lock = process_manager.lock(request[:process_pid], false)
           if(p_lock)
@@ -30,7 +56,7 @@ module Fission
             start_pos = request[:start].to_i
             end_pos = nil
             limit = request[:limit].to_i
-            File.open(p_lock[:process].io.send(request[:type]).path, 'r') do |file|
+            File.open(p_lock[:process].io.send(request[:kind]).path, 'r') do |file|
               file.pos = start_pos
               content << file.read(limit > 0 ? limit : nil)
               end_pos = file.pos
@@ -48,22 +74,35 @@ module Fission
 
       end
 
+      # Provide status information
       class Status < Callback
+
+        # Validity of message
+        #
+        # @param message [Carnivore::Message]
+        # @return [TrueClass, FalseClass]
         def valid?(message)
-          super
-          m = unpack(message)
-          m[:nellie] &&
-            m[:nellie][:request] &&
-            m[:nellie][:request][:type] == 'status'
+          super do |m|
+            m.get(:nellie, :request, :type) == 'status'
+          end
         end
 
+        # Add status information to payload
+        #
+        # @param message [Carnivore::Message]
         def execute(message)
-          payload = unpack(message)
-          request = payload[:nellie].delete(:request)
-          set_status(payload, request[:process_pid])
-          completed(payload, message)
+          failure_wrap(message) do |payload|
+            request = payload[:nellie].delete(:request)
+            set_status(payload, request[:process_pid])
+            completed(payload, message)
+          end
         end
 
+        # Set status into payload
+        #
+        # @param payload [Hash]
+        # @param request [Hash]
+        # @option request [String] :process_pid process UUID
         def set_status(payload, request)
           p_lock = process_manager(request[:process_pid], false)
           if(p_lock)

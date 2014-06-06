@@ -7,23 +7,39 @@ require 'fission-assets/packer'
 
 module Fission
   module Nellie
+    # Command executor
     class Banks < Callback
 
+      # Name of file containing commands
       SCRIPT_NAME = '.nellie'
 
-      attr_reader :object_store, :working_directory
+      # @return [Fission::Assets::Store] object store
+      attr_reader :object_store
+      # @return [String] working directory for execution
+      attr_reader :working_directory
 
+      # Setup object store and configure working directory
       def setup(*_)
         @object_store = Fission::Assets::Store.new
-        @working_directory = Carnivore::Config.get(:fission, :nellie, :working_directory) || '/tmp/nellie'
+        @working_directory = Carnivore::Config.get(
+          :fission, :nellie, :working_directory
+        ) || '/tmp/nellie'
       end
 
+      # Validity of message
+      #
+      # @param message [Carnivore::Message]
+      # @return [Truthy, Falsey]
       def valid?(message)
         super do |m|
-          m[:data][:repository] && !m[:data][:process_notification]
+          m.get(:data, :repository) &&
+            !m.get(:data, :process_notification)
         end
       end
 
+      # Fire off commands until command list has been exhausted
+      #
+      # @param message [Carnivore::Message]
       def execute(message)
         failure_wrap(message) do |payload|
           process_pid = nil
@@ -78,6 +94,10 @@ module Fission
         end
       end
 
+      # Enable pending status payload generation if configuration
+      # has been defined
+      #
+      # @param payload [Hash]
       # @return [Smash, nil]
       def enable_pending(payload)
         if(pending = Carnivore::Config.get(:fission, :nellie, :status))
@@ -94,6 +114,13 @@ module Fission
         end
       end
 
+      # Run a process
+      #
+      # @param command [String] command to run
+      # @param pack [Hash]
+      # @option pack [String] :cwd current working directory of process
+      # @option pack [Hash] :environment custom environment to provide to process
+      # @return [String] process ID (UUID not actual pid)
       def run_process(command, pack={})
         process_pid = Celluloid.uuid
         cwd = pack.delete(:cwd) || '/tmp'
