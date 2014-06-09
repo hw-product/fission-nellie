@@ -57,6 +57,27 @@ This will enable notifications on jobs being executed. Options:
 * `interval` wait interval between notifications (can be subsecond)
 * `source` source that the notificiation payload will be delivered
 
+Data provided in payload (within `:data`):
+
+```json
+{
+  "process_manager": {
+    "state": {
+      "running": true,
+      "failed": false,
+      "process_identifier": "UUID of process",
+      "reference_identifier": "UUID of originating payload",
+      "elapsed_time": "0.01213",
+      "data": {
+        "repository": "org/repo",
+        "reference": "master",
+        "commit_sha": "THE_SHA!"
+      }
+    }
+  }
+}
+```
+
 ## Originating slogan
 
 Fuck Jenkins!
