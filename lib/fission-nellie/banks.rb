@@ -45,8 +45,8 @@ module Fission
           process_pid = nil
           command = nil
           debug "Processing message for testing"
+          repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
           unless(payload[:data][:nellie])
-            repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
             test_path = File.join(
               Fission::Assets::Packer.unpack(
                 object_store.get(payload[:data][:repository][:path]),
@@ -85,6 +85,7 @@ module Fission
               }.merge(payload[:data][:nellie][:environment])
             )
             debug "Process left running with process id of: #{process_pid}"
+            message.confirm!
           else
             [:commands, :environment].each do |key|
               payload[:data][:nellie].delete(key)
