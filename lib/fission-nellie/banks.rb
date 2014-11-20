@@ -82,7 +82,7 @@ module Fission
               :environment => {
                 'NELLIE_GIT_COMMIT_SHA' => retrieve(payload, :data, :github, :head_commit, :id),
                 'NELLIE_GIT_REF' => retrieve(payload, :data, :github, :ref)
-              }.merge(payload[:data][:nellie][:environment])
+              }.merge(payload.fetch(:data,:nellie,:environment,{}))
             )
             debug "Process left running with process id of: #{process_pid}"
             message.confirm!
