@@ -14,6 +14,11 @@ module Fission
         end
       end
 
+      def setup(*_)
+        require 'fission-assets'
+        @object_store = Fission::Assets::Store.new
+      end
+
       # Clean up process and forward payload
       #
       # @param message [Carnivore::Message]
