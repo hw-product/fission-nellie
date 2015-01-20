@@ -58,7 +58,7 @@ module Fission
               debug "Running test at path: #{test_path}"
               begin
                 json = JSON.load(File.read(test_path))
-                debug 'Nellie file is JSON. Populating commands into payload and tossing back to the queue.'
+                debug 'Nellie file is JSON. Populating commands into payload.'
                 payload[:data][:nellie] ||= {}
                 payload[:data][:nellie][:commands] = json['commands']
                 payload[:data][:nellie][:environment] = json.fetch('environment', {})
@@ -76,10 +76,18 @@ module Fission
               :daemon => true,
               :bind => repository_path
             )
+            log_base = File.join(repository_path, payload[:message_id])
             begin
               container.start!(:detach)
               connection = container.lxc.connection
               commands.each do |command|
+                %w(stderr stdout).each do |ext|
+                  File.open("#{log_base}.#{ext}", 'a+') do |file|
+                    file.puts "$ #{command}"
+                  end
+                end
+                debug "Running command from #{message}: #{command}"
+                command = "#{command} 1>> #{log_base}.stdout 2>> #{log_base}.stderr"
                 process_pid = run_process(command,
                   :connection => connection,
                   :source => message[:source],
@@ -91,9 +99,20 @@ module Fission
                     'NELLIE_GIT_REF' => payload.get(:data, :github, :ref)
                   ).merge(payload.fetch(:data, :nellie, :environment, Smash.new))
                 )
+                debug "Command completed from #{message}: #{command}"
               end
+              payload.set(:data, :nellie, :result, :complete, true)
             ensure
               container.lxc.stop
+              %w(stderr stdout).each do |ext|
+                if(File.exists?("#{log_base}.#{ext}"))
+                  log = File.open("#{log_base}.#{ext}", 'rb')
+                  object_key = "nellie/#{File.basename(log_base)}.#{ext}"
+                  object_store.put(object_key, log)
+                  log.close
+                  payload.set(:data, :nellie, :result, :logs, ext, object_key)
+                end
+              end
             end
           end
           message.confirm!
@@ -140,38 +159,8 @@ module Fission
         end
         result = con.execute command
         unless(result.exit_status == 0)
-          error "FAILED: #{result.stderr.join("\n")}"
-          raise 'OMG NELLIE FAILED! WHY GOD WHY!?!?!?!!?!?!?!'
-        else
-          info "COMMAND SUCCESS!!!! #{result.stdout.join("\n")}"
+          raise "Command failed! (#{command})"
         end
-      end
-
-      # Set payload data for mail type notifications
-      # TODO: custom mail address provided via .nellie file?
-      def set_success_email(payload)
-        project_name = retrieve(payload, :data, :github, :repository, :name)
-        completed_sha = retrieve(payload, :data, :github, :after)
-        dest_email = [
-          retrieve(payload, :data, :github, :repository, :owner, :email),
-          retrieve(payload, :data, :github, :pusher, :email)
-        ].compact
-        details = retrieve(payload, :data, :github, :compare)
-        notify = {
-          :destination => dest_email.map{ |target|
-            {:email => target}
-          },
-          :origin => {
-            :email => origin[:email],
-            :name => origin[:name]
-          }
-        }
-        notify.merge!(
-          :subject => "[#{origin[:name]}] SUCCESS #{project_name} build complete",
-          :message => "Build of #{project_name} at SHA: #{completed_sha} has successfully built.\nComparision at: #{details}",
-          :html => false
-        )
-        payload[:data][:notification_email] = notify
       end
 
     end
