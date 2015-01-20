@@ -1,5 +1,7 @@
 require 'shellwords'
 require 'fission/callback'
+require 'fission-nellie/bly'
+require 'fission-nellie/trent'
 require 'fission-nellie/validators/validate'
 require 'fission-nellie/validators/repository'
 require 'fission-assets'

@@ -1,5 +1,2 @@
 require 'fission'
 require 'fission-nellie/version'
-require 'fission-nellie/banks'
-require 'fission-nellie/bly'
-require 'fission-nellie/trent'
