@@ -1,155 +1,73 @@
-require 'shellwords'
-require 'fission/callback'
-require 'fission-nellie/validators/validate'
-require 'fission-nellie/validators/repository'
-require 'fission-assets'
-require 'fission-assets/packer'
+require 'elecksee'
+require 'jackal-nellie'
+require 'fission-nellie'
 
 module Fission
   module Nellie
-    # Command executor
-    class Melba < Callback
+    class Melba < Jackal::Nellie::Processor
 
-      # Name of file containing commands
-      SCRIPT_NAME = '.nellie'
 
-      # @return [Fission::Assets::Store] object store
-      attr_reader :object_store
-      # @return [String] working directory for execution
-      attr_reader :working_directory
-
-      # Setup object store and configure working directory
-      def setup(*_)
-        @object_store = Fission::Assets::Store.new
-        @working_directory = Carnivore::Config.fetch(
-          :fission, :nellie, :working_directory, '/tmp/nellie'
+      def run_commands(commands, env, payload, process_cwd)
+        container = Lxc::Ephemeral.new(
+          :original => 'ubuntu_1204',
+          :daemon => true,
+          :bind => process_cwd
         )
-      end
-
-      # Validity of message
-      #
-      # @param message [Carnivore::Message]
-      # @return [Truthy, Falsey]
-      def valid?(message)
-        super do |m|
-          m.get(:data, :repository) &&
-            !m.get(:data, :nellie)
-        end
-      end
-
-      # Fire off commands until command list has been exhausted
-      #
-      # @param message [Carnivore::Message]
-      def execute(message)
-        failure_wrap(message) do |payload|
-          process_pid = nil
-          command = nil
-          debug "Processing message for testing"
-          repository_path = File.join(working_directory, File.basename(payload[:data][:repository][:path]))
-          unless(payload[:data][:nellie])
-            test_path = File.join(
-              Fission::Assets::Packer.unpack(
-                object_store.get(payload[:data][:repository][:path]),
-                repository_path,
-                :disable_overwrite
-              ), SCRIPT_NAME
-            )
-            if(File.exists?(test_path))
-              debug "Running test at path: #{test_path}"
-              begin
-                json = JSON.load(File.read(test_path))
-                debug 'Nellie file is JSON. Populating commands into payload.'
-                payload[:data][:nellie] ||= {}
-                payload[:data][:nellie][:commands] = json['commands']
-                payload[:data][:nellie][:environment] = json.fetch('environment', {})
-              rescue
-                debug 'Looks like that wasn\'t JSON. Lets just execute it!'
-                command = File.executable?(test_path) ? test_path : "/bin/bash #{test_path}"
-              end
-            else
-              abort "No nellie file found! (checked: #{test_path})"
-            end
-          end
-          if(commands = payload.get(:data, :nellie, :commands))
-            container = Lxc::Ephemeral.new(
-              :original => 'ubuntu_1204',
-              :daemon => true,
-              :bind => repository_path
-            )
-            log_base = File.join(repository_path, payload[:message_id])
-            begin
-              container.start!(:detach)
-              connection = container.lxc.connection
-              commands.each do |command|
-                %w(stderr stdout).each do |ext|
-                  File.open("#{log_base}.#{ext}", 'a+') do |file|
-                    file.puts "$ #{command}"
-                  end
-                end
-                debug "Running command from #{message}: #{command}"
-                command = "#{command} 1>> #{log_base}.stdout 2>> #{log_base}.stderr"
-                process_pid = run_process(command,
-                  :connection => connection,
-                  :source => message[:source],
-                  :payload => payload,
-                  :cwd => repository_path,
-                  :pending => enable_pending(payload),
-                  :environment => Smash.new(
-                    'NELLIE_GIT_COMMIT_SHA' => payload.get(:data, :github, :head_commit, :id),
-                    'NELLIE_GIT_REF' => payload.get(:data, :github, :ref)
-                  ).merge(payload.fetch(:data, :nellie, :environment, Smash.new))
-                )
-                debug "Command completed from #{message}: #{command}"
-              end
-              payload.set(:data, :nellie, :result, :complete, true)
-            ensure
-              container.lxc.stop
-              %w(stderr stdout).each do |ext|
-                if(File.exists?("#{log_base}.#{ext}"))
-                  log = File.open("#{log_base}.#{ext}", 'rb')
-                  object_key = "nellie/#{File.basename(log_base)}.#{ext}"
-                  object_store.put(object_key, log)
-                  log.close
-                  payload.set(:data, :nellie, :result, :logs, ext, object_key)
-                end
+        results = []
+        begin
+          container.start!(:detach)
+          connection = container.lxc.connection
+          commands.each do |command|
+            result = Smash.new
+            log_base = File.join(process_cwd, Celluloid.uuid)
+            %w(stderr stdout).each do |ext|
+              File.open("#{log_base}.#{ext}", 'w+') do |file|
+                file.puts "$ #{command}"
               end
             end
-          end
-          message.confirm!
-          [:commands, :environment].each do |key|
-            payload[:data][:nellie].delete(key)
-          end
-          job_completed(:nellie, payload, message)
-        end
-      end
-
-      # Enable pending status payload generation if configuration
-      # has been defined
-      #
-      # @param payload [Hash]
-      # @return [Smash, nil]
-      def enable_pending(payload)
-        if(false) #pending = Carnivore::Config.get(:fission, :nellie, :status))
-          Smash.new.tap do |pending_config|
-            pending_config[:interval] = pending[:interval]
-            pending_config[:source] = pending[:source]
-            pending_config[:reference] = payload[:message_id]
-            pending_config[:data] = Smash.new(
-              :repository => payload.get(:data, :github, :repository, :name),
-              :reference => payload.get(:data, :github, :ref),
-              :commit_sha => payload.get(:data, :github, :after)
+            debug "Running command from payload #{payload[:message_id]}: #{command}"
+            command = "#{command} 1>> #{log_base}.stdout 2>> #{log_base}.stderr"
+            result[:start_time] = Time.now.to_i
+            result[:exit_code] = run_process(command,
+              :connection => connection,
+              :payload => payload,
+              :cwd => process_cwd,
+              :environment => Smash.new(
+                'NELLIE_GIT_COMMIT_SHA' => payload.get(:data, :code_fetcher, :info, :commit_sha),
+                'NELLIE_GIT_REF' => payload.get(:data, :code_fetcher, :info, :reference)
+              ).merge(payload.fetch(:data, :nellie, :environment, Smash.new))
             )
+            result[:stop_time] = Time.now.to_i
+            debug "Command completed from payload #{payload[:message_id]}: #{command}"
+            %w(stderr stdout).each do |ext|
+              path = "#{log_base}.#{ext}"
+              key = "nellie/#{path}"
+              asset_store.put(key, File.open(path, 'r'))
+              result.set(:logs, ext, key)
+              File.delete(path)
+            end
+            results << result
+            unless(result[:exit_code] == 0)
+              payload.set(:data, :nellie, :result, :failed, true)
+              break
+            end
           end
+        ensure
+          container.lxc.stop
         end
+        results
       end
 
       # Run a process
       #
       # @param command [String] command to run
       # @param pack [Hash]
+      # @option pack [Rye::Box] :connection connection to container
       # @option pack [String] :cwd current working directory of process
       # @option pack [Hash] :environment custom environment to provide to process
-      # @return [String] process ID (UUID not actual pid)
+      # @return [Integer] process exit status (returns -1 on exception)
+      # @note need to update exception handling to nest error into
+      #   logs for display
       def run_process(command, pack={})
         warn "Running command: #{command.inspect}"
         con = pack[:connection]
@@ -157,9 +75,12 @@ module Fission
         pack[:environment].each do |key, value|
           con.setenv(key, value)
         end
-        result = con.execute command
-        unless(result.exit_status == 0)
-          raise "Command failed! (#{command})"
+        begin
+          result = con.execute command
+          result.exit_status
+        rescue => e
+          warn "Failed to run command: #{e.class} - #{e} (`#{command}`)"
+          -1
         end
       end
 
