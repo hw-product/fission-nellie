@@ -11,5 +11,6 @@ Gem::Specification.new do |s|
   s.require_path = 'lib'
   s.add_dependency 'fission'
   s.add_dependency 'elecksee'
+  s.add_dependency 'jackal-nellie'
   s.files = Dir['**/*']
 end
