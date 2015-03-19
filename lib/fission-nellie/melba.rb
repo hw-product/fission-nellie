@@ -4,9 +4,16 @@ require 'fission-nellie'
 
 module Fission
   module Nellie
+    # Container based nellie
     class Melba < Jackal::Nellie::Processor
 
-
+      # Run collection of commands
+      #
+      # @param commands [Array<String>] commands to execute
+      # @param env [Hash] environment variables for process
+      # @param payload [Smash]
+      # @param process_cwd [String] working directory for process
+      # @return [Array<Smash>] command results ({:start_time, :stop_time, :exit_code, :logs, :timed_out})
       def run_commands(commands, env, payload, process_cwd)
         container = Lxc::Ephemeral.new(
           :original => 'ubuntu_1204',
@@ -17,16 +24,12 @@ module Fission
         begin
           container.start!(:detach)
           connection = container.lxc.connection
+          log_path = File.join(process_cwd, "#{payload[:message_id]}.log")
           commands.each do |command|
             result = Smash.new
-            log_base = File.join(process_cwd, Celluloid.uuid)
-            %w(stderr stdout).each do |ext|
-              File.open("#{log_base}.#{ext}", 'w+') do |file|
-                file.puts "$ #{command}"
-              end
-            end
+            File.open(log_path, 'a+'){|file| file.puts "$ #{command}" }
             debug "Running command from payload #{payload[:message_id]}: #{command}"
-            command = "#{command} 1>> #{log_base}.stdout 2>> #{log_base}.stderr"
+            command = "#{command} >> #{log_path} 2>&1"
             result[:start_time] = Time.now.to_i
             result[:exit_code] = run_process(command,
               :connection => connection,
@@ -39,19 +42,15 @@ module Fission
             )
             result[:stop_time] = Time.now.to_i
             debug "Command completed from payload #{payload[:message_id]}: #{command}"
-            %w(stderr stdout).each do |ext|
-              path = "#{log_base}.#{ext}"
-              key = "nellie/#{path}"
-              asset_store.put(key, File.open(path, 'r'))
-              result.set(:logs, ext, key)
-              File.delete(path)
-            end
             results << result
             unless(result[:exit_code] == 0)
               payload.set(:data, :nellie, :result, :failed, true)
               break
             end
           end
+          log_key = "nellie/#{payload[:message_id]}.log"
+          asset_store.put(log_key, File.open(log_path, 'r'))
+          payload.set(:data, :nellie, :result, :log, log_key)
         ensure
           container.lxc.stop
         end
