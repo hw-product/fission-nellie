@@ -1,3 +1,6 @@
+# v0.1.8
+* Retain all logs within single asset
+
 # v0.1.6
 * Include missing dependency on jackal-nellie
 
