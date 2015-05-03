@@ -38,7 +38,7 @@ module Fission
               :environment => Smash.new(
                 'NELLIE_GIT_COMMIT_SHA' => payload.get(:data, :code_fetcher, :info, :commit_sha),
                 'NELLIE_GIT_REF' => payload.get(:data, :code_fetcher, :info, :reference)
-              ).merge(payload.fetch(:data, :nellie, :environment, Smash.new))
+              ).merge(payload.fetch(:data, :nellie, :environment, Smash.new)).merge(config.fetch(:environment, Smash.new)
             )
             result[:stop_time] = Time.now.to_i
             debug "Command completed from payload #{payload[:message_id]}: #{command}"
