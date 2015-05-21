@@ -1,3 +1,7 @@
+# v0.1.10
+* Support environment variables via configuration
+* Add service registration
+
 # v0.1.8
 * Retain all logs within single asset
 
