@@ -50,7 +50,7 @@ module Fission
           end
           log_key = "nellie/#{payload[:message_id]}.log"
           asset_store.put(log_key, File.open(log_path, 'r'))
-          payload.set(:data, :nellie, :result, :log, log_key)
+          payload.set(:data, :nellie, :logs, :output, log_key)
         ensure
           container.lxc.stop
         end
