@@ -5,6 +5,6 @@ Configuration.new do
       sources ['carnivore-actor']
     end
     sources.nellie.type 'actor'
-    workers.nellie 1
+    workers.nellie.melba 1
   end
 end
