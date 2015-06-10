@@ -13,5 +13,7 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency 'elecksee'
   s.add_runtime_dependency 'jackal-nellie', '>= 0.1.4', '< 1.0.0'
   s.add_development_dependency 'carnivore-actor'
+  s.add_development_dependency 'minitest'
+  s.add_development_dependency 'pry'
   s.files = Dir['lib/**/**/*'] + %w(fission-nellie.gemspec README.md CHANGELOG.md)
 end
