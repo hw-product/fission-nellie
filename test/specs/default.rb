@@ -9,7 +9,7 @@ describe Fission::Nellie do
   end
 
   it 'should providing a running nellie source' do
-    Carnivore::Supervisor.supervisor[:nellie].wont_be_nil
+    Carnivore::Supervisor.supervisor[:nellie].name.must_equal :nellie
   end
 
 end
