@@ -1,7 +1,7 @@
 Configuration.new do
   fission do
     loaders do
-      workers ['fission-nellie']
+      workers ['fission-nellie/melba']
       sources ['carnivore-actor']
     end
     sources.nellie.type 'actor'
