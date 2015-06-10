@@ -9,8 +9,9 @@ Gem::Specification.new do |s|
   s.homepage = 'http://github.com/heavywater/fission-nellie'
   s.description = 'Do things'
   s.require_path = 'lib'
-  s.add_dependency 'fission', '> 0.2.4', '< 1.0.0'
-  s.add_dependency 'elecksee'
-  s.add_dependency 'jackal-nellie', '>= 0.1.4', '< 1.0.0'
+  s.add_runtime_dependency 'fission', '> 0.2.4', '< 1.0.0'
+  s.add_runtime_dependency 'elecksee'
+  s.add_runtime_dependency 'jackal-nellie', '>= 0.1.4', '< 1.0.0'
+  s.add_development_dependency 'carnivore-actor'
   s.files = Dir['lib/**/**/*'] + %w(fission-nellie.gemspec README.md CHANGELOG.md)
 end
