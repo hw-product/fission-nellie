@@ -1,4 +1,3 @@
-require 'elecksee'
 require 'jackal-nellie'
 require 'fission-nellie'
 
@@ -6,6 +5,12 @@ module Fission
   module Nellie
     # Container based nellie
     class Melba < Jackal::Nellie::Processor
+
+      # Setup the callback
+      def setup(*_)
+        require 'elecksee'
+        super
+      end
 
       # Run collection of commands
       #
