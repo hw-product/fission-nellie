@@ -1,3 +1,7 @@
+# v0.1.12
+* Update storage location of log asset keys
+* Scrub deprecated classes
+
 # v0.1.10
 * Support environment variables via configuration
 * Add service registration
