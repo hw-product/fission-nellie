@@ -21,15 +21,25 @@ module Fission
       # @return [Array<Smash>] command results ({:start_time, :stop_time, :exit_code, :logs, :timed_out})
       def run_commands(commands, env, payload, process_cwd)
         container = Lxc::Ephemeral.new(
-          :original => 'ubuntu_1204',
+          :original => 'ubuntu_1404',
           :daemon => true,
           :bind => process_cwd
         )
         results = []
+        log_path = File.join(process_cwd, "#{payload[:message_id]}.log")
+        log_file = File.open(log_path, 'r')
+        event_content = ''
+        event_generator = every(1) do
+          event_content << log_file.read
+          event_content = event_content.split(/[\r\n]+/)
+          event_content.slice(0, event_content - 1).each do |line|
+            event!(:info, :info => line)
+          end
+          event_content = event_content.last
+        end
         begin
           container.start!(:detach)
           connection = container.lxc.connection
-          log_path = File.join(process_cwd, "#{payload[:message_id]}.log")
           commands.each do |command|
             result = Smash.new
             File.open(log_path, 'a+'){|file| file.puts "$ #{command}" }
@@ -58,6 +68,7 @@ module Fission
           payload.set(:data, :nellie, :logs, :output, log_key)
         ensure
           container.lxc.stop
+          event_generator.cancel
         end
         results
       end
@@ -81,7 +92,7 @@ module Fission
         end
         begin
           result = con.execute command
-          result.exit_status
+          defer{ result.exit_status }
         rescue => e
           warn "Failed to run command: #{e.class} - #{e} (`#{command}`)"
           -1
