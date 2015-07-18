@@ -1,3 +1,6 @@
+# v0.1.14
+* Add event generation
+
 # v0.1.12
 * Update storage location of log asset keys
 * Scrub deprecated classes
