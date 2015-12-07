@@ -6,12 +6,6 @@ module Fission
     # Container based nellie
     class Melba < Jackal::Nellie::Processor
 
-      # Setup the callback
-      def setup(*_)
-        require 'elecksee'
-        super
-      end
-
       # Run collection of commands
       #
       # @param commands [Array<String>] commands to execute
@@ -20,83 +14,76 @@ module Fission
       # @param process_cwd [String] working directory for process
       # @return [Array<Smash>] command results ({:start_time, :stop_time, :exit_code, :logs, :timed_out})
       def run_commands(commands, env, payload, process_cwd)
-        container = Lxc::Ephemeral.new(
-          :original => 'ubuntu_1404',
-          :daemon => true,
-          :bind => process_cwd
-        )
+
+        event!(:info, :info => 'Starting nellie command execution!', :message_id => payload[:message_id])
+
+        log_file = Tempfile.new('nellie')
+        container = remote_process
+        w_space = Fission::Assets::Packer.pack(workspace(uuid))
+        ephemeral.push_file(w_space, '/tmp/workspace.zip')
+        ephemeral.exec!("mkdir -p #{process_cwd}")
+        ephemeral.exec!("unzip /tmp/workspace.zip -d #{process_cwd}")
+
         results = []
-        log_path = File.join(process_cwd, "#{payload[:message_id]}.log")
-        log_file = File.open(log_path, 'r')
-        event_content = ''
-        event_generator = every(1) do
-          event_content << log_file.read
-          event_content = event_content.split(/[\r\n]+/)
-          event_content.slice(0, event_content - 1).each do |line|
-            event!(:info, :info => line)
-          end
-          event_content = event_content.last
-        end
-        begin
-          container.start!(:detach)
-          connection = container.lxc.connection
-          commands.each do |command|
-            result = Smash.new
-            File.open(log_path, 'a+'){|file| file.puts "$ #{command}" }
-            debug "Running command from payload #{payload[:message_id]}: #{command}"
-            command = "#{command} >> #{log_path} 2>&1"
-            result[:start_time] = Time.now.to_i
-            result[:exit_code] = run_process(command,
-              :connection => connection,
-              :payload => payload,
-              :cwd => process_cwd,
-              :environment => Smash.new(
-                'NELLIE_GIT_COMMIT_SHA' => payload.get(:data, :code_fetcher, :info, :commit_sha),
-                'NELLIE_GIT_REF' => payload.get(:data, :code_fetcher, :info, :reference)
-              ).merge(payload.fetch(:data, :nellie, :environment, Smash.new)).merge(config.fetch(:environment, Smash.new))
-            )
-            result[:stop_time] = Time.now.to_i
-            debug "Command completed from payload #{payload[:message_id]}: #{command}"
-            results << result
-            unless(result[:exit_code] == 0)
-              payload.set(:data, :nellie, :result, :failed, true)
-              break
+        e_vars = Smash.new(
+          'NELLIE_GIT_COMMIT_SHA' => payload.get(:data, :code_fetcher, :info, :commit_sha),
+          'NELLIE_GIT_REF' => payload.get(:data, :code_fetcher, :info, :reference)
+        ).merge(payload.fetch(:data, :nellie, :environment, Smash.new)).merge(config.fetch(:environment, Smash.new))
+
+        commands.each do |command|
+          event!(:info, :info => "Start execution: `#{command}`", :message_id => payload[:message_id])
+          result = Smash.new
+          result[:start_time] = Time.now.to_i
+          future = Zoidberg::Future.new do
+            begin
+              stream = Fission::Utils::RemoteProcess::QueueStream.new
+              cmd_info = container.exec(command,
+                :stream => stream,
+                :timeout => 3600,
+                :cwd => process_cwd,
+                :environment => e_vars
+              )
+              event!(:info, :info => "Complete execution: `#{command}`", :message_id => payload[:message_id])
+              cmd_info
+            rescue => e
+              error "Nellie command failed (ID: #{payload[:message_id]}): #{e.class} - #{e}"
+              debug "#{e.class}: #{e}\n#{e.backtrace.join("\n")}"
+              Fission::Utils::RemoteProcess::Result(-1, "Command failed (ID: #{payload[:message_id]}): #{e.class} - #{e}")
+            ensure
+              stream.write :complete
             end
           end
-          log_key = "nellie/#{payload[:message_id]}.log"
-          asset_store.put(log_key, File.open(log_path, 'r'))
-          payload.set(:data, :nellie, :logs, :output, log_key)
-        ensure
-          container.lxc.stop
-          event_generator.cancel
-        end
-        results
-      end
 
-      # Run a process
-      #
-      # @param command [String] command to run
-      # @param pack [Hash]
-      # @option pack [Rye::Box] :connection connection to container
-      # @option pack [String] :cwd current working directory of process
-      # @option pack [Hash] :environment custom environment to provide to process
-      # @return [Integer] process exit status (returns -1 on exception)
-      # @note need to update exception handling to nest error into
-      #   logs for display
-      def run_process(command, pack={})
-        warn "Running command: #{command.inspect}"
-        con = pack[:connection]
-        con.cd pack.fetch(:cwd, '/tmp')
-        pack[:environment].each do |key, value|
-          con.setenv(key, value)
+          until((lines = stream.pop) == :complete)
+            lines.split("\n").each do |line|
+              next if line.empty?
+              debug "Log line: #{line}"
+              log_file.puts line
+              event!(:info, :info => line, :message_id => payload[:message_id])
+            end
+          end
+
+          cmd_result = future.value
+          result[:stop_time] = Time.now.to_i
+          result[:exit_code] = cmd_result.exit_code
+
+          unless(cmd_result.success?)
+            payload.set(:data, :nellie, :result, :failed, true)
+            break
+          end
+
+          results << result
         end
-        begin
-          result = con.execute command
-          defer{ result.exit_status }
-        rescue => e
-          warn "Failed to run command: #{e.class} - #{e} (`#{command}`)"
-          -1
-        end
+
+        container.terminate
+
+        log_file.flush
+        log_file.rewind
+        log_key = "nellie/#{payload[:message_id]}.log"
+        asset_store.put(log_key, log_file)
+        log_file.delete
+        payload.set(:data, :nellie, :logs, :output, log_key)
+        results
       end
 
     end
