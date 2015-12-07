@@ -10,7 +10,6 @@ Gem::Specification.new do |s|
   s.description = 'Do things'
   s.require_path = 'lib'
   s.add_runtime_dependency 'fission', '> 0.2.4', '< 1.0.0'
-  s.add_runtime_dependency 'elecksee'
   s.add_runtime_dependency 'jackal-nellie', '>= 0.1.4', '< 1.0.0'
   s.add_development_dependency 'carnivore-actor'
   s.add_development_dependency 'minitest'
