@@ -19,10 +19,10 @@ module Fission
 
         log_file = Tempfile.new('nellie')
         container = remote_process
-        w_space = Fission::Assets::Packer.pack(workspace(uuid))
-        ephemeral.push_file(w_space, '/tmp/workspace.zip')
-        ephemeral.exec!("mkdir -p #{process_cwd}")
-        ephemeral.exec!("unzip /tmp/workspace.zip -d #{process_cwd}")
+        w_space = Fission::Assets::Packer.pack(process_cwd)
+        container.push_file(w_space, '/tmp/workspace.zip')
+        container.exec!("mkdir -p #{process_cwd}")
+        container.exec!("unzip /tmp/workspace.zip -d #{process_cwd}")
 
         results = []
         e_vars = Smash.new(
@@ -34,9 +34,9 @@ module Fission
           event!(:info, :info => "Start execution: `#{command}`", :message_id => payload[:message_id])
           result = Smash.new
           result[:start_time] = Time.now.to_i
+          stream = Fission::Utils::RemoteProcess::QueueStream.new
           future = Zoidberg::Future.new do
             begin
-              stream = Fission::Utils::RemoteProcess::QueueStream.new
               cmd_info = container.exec(command,
                 :stream => stream,
                 :timeout => 3600,
