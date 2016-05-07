@@ -1,5 +1,7 @@
 require 'fission'
+require 'jackal-nellie/formatter'
 
+# Overloads to get expected content when running within fission
 module Jackal
   module Nellie
     module Formatter

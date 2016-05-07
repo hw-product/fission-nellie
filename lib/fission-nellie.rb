@@ -1,5 +1,6 @@
 require 'fission'
 require 'fission-nellie/version'
+require 'fission-nellie/formatter'
 
 module Fission
   module Nellie
