@@ -46,6 +46,7 @@ module Fission
               event!(:info, :info => "Complete execution: `#{command}`", :message_id => payload[:message_id])
               cmd_info
             rescue => e
+              payload.set(:data, :nellie, :result, :failed, true)
               error "Nellie command failed (ID: #{payload[:message_id]}): #{e.class} - #{e}"
               debug "#{e.class}: #{e}\n#{e.backtrace.join("\n")}"
               Fission::Utils::RemoteProcess::Result(-1, "Command failed (ID: #{payload[:message_id]}): #{e.class} - #{e}")
