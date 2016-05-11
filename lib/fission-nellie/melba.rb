@@ -31,10 +31,11 @@ module Fission
         ).merge(payload.fetch(:data, :nellie, :environment, Smash.new)).merge(config.fetch(:environment, Smash.new))
 
         commands.each do |command|
-          event!(:info, :info => "Start execution: `#{command}`", :message_id => payload[:message_id])
+          event!(:info, :info => "Start execution: `#{command.sub(process_cwd, '')}`", :message_id => payload[:message_id])
           result = Smash.new
           result[:start_time] = Time.now.to_i
           stream = Fission::Utils::RemoteProcess::QueueStream.new
+          stream.write("$ #{comamnd.sub(process_cwd, '')}")
           future = Zoidberg::Future.new do
             begin
               cmd_info = container.exec(command,
