@@ -49,6 +49,35 @@ module Jackal
         end
 
       end
+
+      class GithubCommitStatus
+
+        # Format payload to provide output status to GitHub
+        #
+        # @param payload [Smash]
+        def format(payload)
+          if(payload.get(:data, :nellie, :status))
+            payload.set(:data, :github_kit, :status,
+              Smash.new(
+                :repository => [
+                  payload.get(:data, :code_fetcher, :info, :owner),
+                  payload.get(:data, :code_fetcher, :info, :name)
+                ].join('/'),
+                :reference => payload.get(:data, :code_fetcher, :info, :commit_sha),
+                :state => payload.get(:data, :nellie, :status) == 'success' ? 'success' : 'failure',
+                :extras => {
+                  :target_url => job_url(payload),
+                  :context => 'shortorder/nellie',
+                  :description => payload.get(:data, :nellie, :status) == 'success' ?
+                    success_message(payload) :
+                    failure_message(payload)
+                }
+              )
+            )
+          end
+        end
+
+      end
     end
   end
 end
