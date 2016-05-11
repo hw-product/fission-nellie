@@ -29,12 +29,10 @@ module Jackal
         def failure_message(payload)
           msg = ['[nellie]: Failure encountered:']
           msg << ''
-          failed_history = payload.fetch(:data, :nellie, :history, {}).detect do |i|
-            i[:exit_code] != 0
-          end
-          if(failed_history)
+          failed_log = payload.get(:data, :nellie, :logs, :output)
+          if(failed_log)
             msg << 'OUTPUT:' << '' << '```'
-            log = asset_store.get(failed_history.get(:logs, :stdout))
+            log = asset_store.get(failed_log)
             content = []
             while(data = log.readpartial(4096))
               content << data
