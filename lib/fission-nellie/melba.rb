@@ -35,7 +35,7 @@ module Fission
           result = Smash.new
           result[:start_time] = Time.now.to_i
           stream = Fission::Utils::RemoteProcess::QueueStream.new
-          stream.write("$ #{comamnd.sub(process_cwd, '')}")
+          stream.write("$ #{command.sub(process_cwd, '')}")
           future = Zoidberg::Future.new do
             begin
               cmd_info = container.exec(command,
